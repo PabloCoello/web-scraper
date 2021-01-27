@@ -4,6 +4,7 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.ui import Select
 from collections import defaultdict
 import pandas as pd
+from selenium.webdriver.common.by import By
 
 
 class Scraper:
@@ -131,3 +132,57 @@ if __name__ == '__main__':
         df.to_excel('total_'+str(year)+'.xlsx')
             
     sc.close_client()
+
+    from selenium import webdriver
+    from selenium.webdriver.common.keys import Keys
+    from selenium.webdriver.firefox.options import Options
+    from selenium.webdriver.support.ui import Select
+    from collections import defaultdict
+    import pandas as pd
+    from selenium.webdriver.common.by import By
+    # Example 2:
+    # https://selenium-python.readthedocs.io/locating-elements.html
+    months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 
+              'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+    toret = defaultdict(list)
+    years = [2016, 2017, 2018, 2019, 2020]
+    letters = ['A','B','C','E','F','G','I','L','M','N','O','P','R','S','T','V']
+    for month in months:
+
+        #####################
+        path = 'https://seatemperature.info/es/{}/galicia-temperatura-del-agua-del-mar.html'.format(month)
+        options = Options()
+        options.headless = True
+        driver = webdriver.Firefox(firefox_options=options)
+        driver.get(path)
+
+
+        ###############################
+        dial = driver.find_elements(By.CLASS_NAME , 'c1.c2')
+        
+        for button in range(len(dial)):
+            dial.clear()
+            dial = driver.find_elements(By.CLASS_NAME , 'c1.c2')
+            tag = dial[button].find_element(By.CLASS_NAME , 'c4').get_attribute('value')
+            if tag in letters:
+                dial[button].click()
+
+                ###############################
+                table = driver.find_elements(By.CLASS_NAME , 'a5.d32')
+                for elem in range(len(table)):
+                    if (tag == 'A'): # & (elem != 0):
+                        toret['year'].append(years[elem])
+                        toret['month'].append(month)
+                    name = table[elem].find_element(By.CLASS_NAME, 'd34')
+                    unit = table[elem].find_elements(By.CLASS_NAME, 'd36')
+                    for i in unit:
+                        try:
+                            toret[name.text].append(float(i.text.replace('°C', '')))
+                        except:
+                            toret[name.text].append(None)
+                            
+
+        driver.quit()
+
+    df = pd.DataFrame(toret)
+    df.to_excel('temperatura.xlsx')
