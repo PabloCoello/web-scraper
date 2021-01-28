@@ -133,13 +133,6 @@ if __name__ == '__main__':
             
     sc.close_client()
 
-    from selenium import webdriver
-    from selenium.webdriver.common.keys import Keys
-    from selenium.webdriver.firefox.options import Options
-    from selenium.webdriver.support.ui import Select
-    from collections import defaultdict
-    import pandas as pd
-    from selenium.webdriver.common.by import By
     # Example 2:
     # https://selenium-python.readthedocs.io/locating-elements.html
     months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 
