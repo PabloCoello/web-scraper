@@ -11,7 +11,7 @@ class Scraper:
     '''
     Class aimed to retrieve data directly from websites.
     '''
-    def __init__(self, path, buttons, tables):
+    def __init__(self, path, elements):
         '''
         args:
             -path: string, path to the website where de data is.
@@ -41,10 +41,20 @@ class Scraper:
         options.headless = True
         self.driver = webdriver.Firefox(firefox_options=options)
         self.driver.get(path)
-        self.buttons = buttons
-        self.tables = tables
+        self.elements = elements
 
-    def presh_button(self, name, value):
+        self.by_modes = {
+            "id" : 'ID',
+            "xpath" : 'XPATH',
+            "link text" : 'LINK_TEXT',
+            "partial link text" : 'PARTIAL_LINK_TEXT',
+            "name" : 'NAME',
+            "tag name" : 'TAG_NAME',
+            "class name" : 'CLASS_NAME',
+            "css selector" : 'CSS_SELECTOR'
+        }
+
+    def presh_button(self, name, button, value = None):
         '''
         Method for pressing any button in the website.
 
@@ -52,13 +62,34 @@ class Scraper:
             -name: string, name of the button (key in buttons dict)
             -value: string, value to be selected
         '''
-        if self.buttons[name][0] == 'select':
+        if self.elements[name]['type'] == 'select':
             self.select_button(
-                xpath = self.buttons[name][1],
+                button = button,
                 value = value
             )
+        
+        if self.elements[name]['type'] == 'click':
+            self.click_button(button)
 
-    def select_button(self, xpath, value):
+    def find_elements(self, name):
+        '''
+        '''
+        elem_array = self.driver.find_elements(
+                eval('By.' + self.by_modes[self.elements[name]['by'][0]]), 
+                self.elements[name]['by'][1]
+            )
+        return elem_array
+
+    def find_element(self, name):
+        '''
+        '''
+        elem = self.driver.find_element(
+                eval('By.' + self.by_modes[self.elements[name]['by'][0]]), 
+                self.elements[name]['by'][1]
+            )
+        return elem
+
+    def select_button(self, button, value):
         '''
         Specific method for select buttons.
 
@@ -66,17 +97,23 @@ class Scraper:
             -xpath: string, xpath to the button
             -value: string, value to be selected
         '''
-        name = Select(self.driver.find_element_by_xpath(xpath))
+        name = Select(button)
         name.select_by_value(value)
+    
+    def click_button(button):
+        '''
+        '''
+        button.click()
 
-    def get_table(self, name):
+
+    def get_tdth_table(self, name):
         '''
         Retrieves data from a table as df.
 
         args:
             -name: string, name of the table
         '''
-        table = self.driver.find_element_by_xpath(self.tables[name][1])
+        table = self.find_element(name)
 
         data = [item.text for item in table.find_elements_by_xpath(
             ".//*[self::td or self::th]")]
@@ -92,11 +129,29 @@ class Scraper:
                 toret[titles[i]].append(elem)
 
             i = i+1
-            if i == (self.tables[name][0]):
+            if i == (self.elements[name]['ncols']):
                 i = 0
                 row = row + 1
 
         return(pd.DataFrame(toret))
+
+    def get_div_table(self, name):
+        '''
+        '''
+        table = self.find_elements(name)
+        toret = defaultdict(list)
+        for elem in range(len(table)):
+            colname = table[elem].find_element(
+                eval('By.' + self.by_modes[self.elements[name]['by'][0]]), 
+                self.elements[name]['colnames'][1]
+                )
+            unit = table[elem].find_elements(
+                eval('By.' + self.by_modes[self.elements[name]['by'][0]]),
+                self.elements[name]['rownames'][1]
+                )
+            for i in unit:
+                toret[colname.text].append(i.text)
+        return pd.DataFrame(toret)
 
     def close_client(self):
         '''
@@ -106,83 +161,3 @@ class Scraper:
 
 
 if __name__ == '__main__':
-    # Example 1:
-
-    path = 'http://www.intecmar.gal/Informacion/biotoxinas/Evolucion/CierresBatea.aspx'
-    buttons = {
-        'toxicidade': ['select','//*[@id="ctl00_Contenido_dpToxina2"]'],
-        'year': ['select', '//*[@id="ctl00_Contenido_dpAno2"]']
-    }
-
-    tables = {
-        'main': [14, '//*[@id="ctl00_Contenido_GridView2"]']
-    }
-    sc = Scraper(path, buttons, tables)
-
-    sc.presh_button(
-        name = 'toxicidade',
-        value='Todas'
-    )
-    for year in range(1996, 2022):
-        sc.presh_button(
-            name = 'year',
-            value = str(year)
-        )
-        df = sc.get_table(name='main')
-        df.to_excel('total_'+str(year)+'.xlsx')
-            
-    sc.close_client()
-
-    from selenium import webdriver
-    from selenium.webdriver.common.keys import Keys
-    from selenium.webdriver.firefox.options import Options
-    from selenium.webdriver.support.ui import Select
-    from collections import defaultdict
-    import pandas as pd
-    from selenium.webdriver.common.by import By
-    # Example 2:
-    # https://selenium-python.readthedocs.io/locating-elements.html
-    months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 
-              'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
-    toret = defaultdict(list)
-    years = [2016, 2017, 2018, 2019, 2020]
-    letters = ['A','B','C','E','F','G','I','L','M','N','O','P','R','S','T','V']
-    for month in months:
-
-        #####################
-        path = 'https://seatemperature.info/es/{}/galicia-temperatura-del-agua-del-mar.html'.format(month)
-        options = Options()
-        options.headless = True
-        driver = webdriver.Firefox(firefox_options=options)
-        driver.get(path)
-
-
-        ###############################
-        dial = driver.find_elements(By.CLASS_NAME , 'c1.c2')
-        
-        for button in range(len(dial)):
-            dial.clear()
-            dial = driver.find_elements(By.CLASS_NAME , 'c1.c2')
-            tag = dial[button].find_element(By.CLASS_NAME , 'c4').get_attribute('value')
-            if tag in letters:
-                dial[button].click()
-
-                ###############################
-                table = driver.find_elements(By.CLASS_NAME , 'a5.d32')
-                for elem in range(len(table)):
-                    if (tag == 'A'): # & (elem != 0):
-                        toret['year'].append(years[elem])
-                        toret['month'].append(month)
-                    name = table[elem].find_element(By.CLASS_NAME, 'd34')
-                    unit = table[elem].find_elements(By.CLASS_NAME, 'd36')
-                    for i in unit:
-                        try:
-                            toret[name.text].append(float(i.text.replace('°C', '')))
-                        except:
-                            toret[name.text].append(None)
-                            
-
-        driver.quit()
-
-    df = pd.DataFrame(toret)
-    df.to_excel('temperatura.xlsx')
